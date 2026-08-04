@@ -140,44 +140,78 @@ def create_task(body: dict):
 
 @app.put("/tasks/{task_id}", summary="Update a task")
 def update_task(task_id: int, body: dict):
-    task = next(
-        (task for task in tasks if task["id"] == task_id),
-        None,
-    )
+    with get_database_connection() as connection:
+        existing_task = connection.execute(
+            """
+            SELECT id, title, done
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        ).fetchone()
 
-    if task is None:
-        return JSONResponse(
-            status_code=404,
-            content={"error": f"Task {task_id} not found"},
-        )
-
-    if not body or not any(key in body for key in ["title", "done"]):
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Provide title or done"},
-        )
-
-    if "title" in body:
-        title = body["title"]
-
-        if not isinstance(title, str) or not title.strip():
+        if existing_task is None:
             return JSONResponse(
-                status_code=400,
-                content={"error": "Title cannot be empty"},
+                status_code=404,
+                content={"error": "Task not found"},
             )
 
-        task["title"] = title.strip()
-
-    if "done" in body:
-        if not isinstance(body["done"], bool):
+        if not body or not any(
+            key in body for key in ["title", "done"]
+        ):
             return JSONResponse(
                 status_code=400,
-                content={"error": "Done must be true or false"},
+                content={"error": "Provide title or done"},
             )
 
-        task["done"] = body["done"]
+        updated_title = existing_task["title"]
+        updated_done = bool(existing_task["done"])
 
-    return task
+        if "title" in body:
+            title = body["title"]
+
+            if not isinstance(title, str) or not title.strip():
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Title cannot be empty"},
+                )
+
+            updated_title = title.strip()
+
+        if "done" in body:
+            if not isinstance(body["done"], bool):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Done must be true or false"},
+                )
+
+            updated_done = body["done"]
+
+        connection.execute(
+            """
+            UPDATE tasks
+            SET title = ?, done = ?
+            WHERE id = ?
+            """,
+            (
+                updated_title,
+                int(updated_done),
+                task_id,
+            ),
+        )
+
+        connection.commit()
+
+        updated_task = connection.execute(
+            """
+            SELECT id, title, done
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        ).fetchone()
+
+    return convert_task_row(updated_task)
 
 
 @app.delete(
@@ -186,16 +220,21 @@ def update_task(task_id: int, body: dict):
     summary="Delete a task",
 )
 def delete_task(task_id: int):
-    task = next(
-        (task for task in tasks if task["id"] == task_id),
-        None,
-    )
-
-    if task is None:
-        return JSONResponse(
-            status_code=404,
-            content={"error": f"Task {task_id} not found"},
+    with get_database_connection() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
         )
 
-    tasks.remove(task)
+        if cursor.rowcount == 0:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Task not found"},
+            )
+
+        connection.commit()
+
     return Response(status_code=204)
