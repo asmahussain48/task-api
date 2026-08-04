@@ -148,7 +148,7 @@ WHERE done = 1;
 
 ## Database Screenshot
 
-![SQLite database screenshot](screenshots/database-view.png)
+![SQLite database screenshot](docs/database-view.png)
 
 ## Persistence
 
