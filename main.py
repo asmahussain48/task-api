@@ -47,12 +47,12 @@ def initialize_database():
 
 
 initialize_database()
-tasks = [
-    {"id": 1, "title": "Learn FastAPI", "done": False},
-    {"id": 2, "title": "Build CRUD API", "done": False},
-    {"id": 3, "title": "Push project to GitHub", "done": True},
-]
-
+def convert_task_row(row):
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "done": bool(row["done"]),
+    }
 
 @app.get("/", summary="Show API information")
 def get_api_information():
@@ -70,19 +70,37 @@ def health_check():
 
 @app.get("/tasks", summary="List all tasks")
 def get_tasks():
-    return tasks
+    with get_database_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, title, done
+            FROM tasks
+            ORDER BY id
+            """
+        ).fetchall()
+
+    return [convert_task_row(row) for row in rows]
 
 
 @app.get("/tasks/{task_id}", summary="Get one task")
 def get_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            return task
+    with get_database_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id, title, done
+            FROM tasks
+            WHERE id = ?
+            """,
+            (task_id,),
+        ).fetchone()
 
-    return JSONResponse(
-        status_code=404,
-        content={"error": f"Task {task_id} not found"},
-    )
+    if row is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Task not found"},
+        )
+
+    return convert_task_row(row)
 
 
 @app.post("/tasks", status_code=201, summary="Create a new task")
