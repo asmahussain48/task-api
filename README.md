@@ -1,54 +1,81 @@
-# Task API with SQLite
+# Task API with PostgreSQL and Docker
 
-A CRUD Task API built using FastAPI and SQLite.
+A CRUD task API built with FastAPI and PostgreSQL. Docker Compose starts the API and database together with one command.
 
-The API allows users to:
+## Why PostgreSQL and Docker?
 
-- View all tasks
-- View one task
-- Create a task
-- Update a task
-- Delete a task
+PostgreSQL provides a dedicated relational database server suitable for applications that need reliable concurrent access and durable data. Docker keeps the Python and PostgreSQL environments reproducible, while Docker Compose connects both services and starts them together. A named Docker volume stores PostgreSQL data outside the database container so recreating containers does not erase tasks.
 
-All tasks are stored permanently in a SQLite database.
-
-## Technologies Used
-
-- Python
-- FastAPI
-- SQLite
-- Uvicorn
-
-## Why SQLite Was Chosen
-
-SQLite was chosen because it is lightweight, simple to use, and does not require a separate database server.
-
-The complete database is stored in one file, which makes SQLite suitable for small projects and learning backend database concepts.
-
-## Database Location
-
-The SQLite database file is named:
+## Project Architecture
 
 ```text
-tasks.db
+main.py                              creates the FastAPI application
+routes/task_routes.py                defines the HTTP endpoints
+services/task_service.py             contains validation and business logic
+repositories/task_repository.py      defines the repository interface
+repositories/postgres_repository.py  implements that interface for PostgreSQL
+repositories/sqlite_repository.py    preserves the previous SQLite implementation
+dependencies.py                      selects PostgresTaskRepository
+database/init.sql                    creates and seeds the tasks table
+docker-compose.yml                   starts FastAPI and PostgreSQL
 ```
 
-It is automatically created in the same directory as `main.py` when the application starts.
+Only the repository selection in `dependencies.py` was switched from SQLite to PostgreSQL. The existing routes and service were left unchanged because the PostgreSQL repository implements the same interface and no blocking bug was found in either layer. This preserves the existing endpoints, status codes, validation messages, and response shapes.
 
-The application also automatically:
+## Environment Setup
 
-- Creates the `tasks` table if it does not exist
-- Inserts three example tasks if the table is empty
+Docker Desktop (or Docker Engine with the Compose plugin) is required.
 
-## Database Structure
+1. Copy `.env.example` to `.env`.
+2. Replace the example password in `.env` with a private password.
+3. Keep all four values consistent: the username, password, and database name inside `DATABASE_URL` must match the three `POSTGRES_*` values.
 
-The `tasks` table contains the following columns:
+Example structure:
 
-| Column | Type | Description |
-|---|---|---|
-| id | INTEGER | Unique task ID |
-| title | TEXT | Task title |
-| done | BOOLEAN | Task completion status |
+```dotenv
+POSTGRES_USER=taskuser
+POSTGRES_PASSWORD=your_private_password
+POSTGRES_DB=tasksdb
+DATABASE_URL=postgresql://taskuser:your_private_password@db:5432/tasksdb
+```
+
+The hostname is `db` because that is the PostgreSQL service name in Docker Compose. The real `.env` file is ignored by both Git and the Docker build context. `.env.example` is safe to commit because it contains placeholder credentials only.
+
+## Start the Application
+
+From the project directory, run:
+
+```bash
+docker compose up
+```
+
+To build and run in the background:
+
+```bash
+docker compose up --build -d
+```
+
+The API is available at `http://localhost:8000`, and Swagger UI is at `http://localhost:8000/docs`.
+
+Check the services with:
+
+```bash
+docker compose ps
+```
+
+Stop the services without deleting stored data:
+
+```bash
+docker compose down
+```
+
+Do not use `docker compose down -v` unless you intentionally want to delete the PostgreSQL volume and all stored tasks.
+
+## Database Initialization and Persistence
+
+On the first start of a new volume, PostgreSQL runs `database/init.sql`. It creates the `tasks` table and inserts the same three starter tasks used by the previous SQLite implementation. The named volume `postgres_data` is mounted at `/var/lib/postgresql/data`.
+
+The persistence test performed for this assignment is documented in the verification section below.
 
 ## API Endpoints
 
@@ -62,100 +89,27 @@ The `tasks` table contains the following columns:
 | PUT | `/tasks/{task_id}` | Update a task |
 | DELETE | `/tasks/{task_id}` | Delete a task |
 
-## How to Run the Project
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/asmahussain48/task-api.git
-```
-
-### 2. Enter the project directory
-
-```bash
-cd task-api
-```
-
-### 3. Create a virtual environment
-
-```bash
-python -m venv venv
-```
-
-### 4. Activate the virtual environment
-
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-macOS or Linux:
-
-```bash
-source venv/bin/activate
-```
-
-### 5. Install the dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 6. Start the FastAPI server
-
-```bash
-uvicorn main:app --reload
-```
-
-### 7. Open Swagger documentation
-
-Open this address in your browser:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-## Example Request
-
-Create a task using:
+Create request example:
 
 ```json
 {
-  "title": "Learn SQLite"
+  "title": "Learn PostgreSQL"
 }
 ```
 
-Example response:
+Update request example:
 
 ```json
 {
-  "id": 4,
-  "title": "Learn SQLite",
-  "done": false
+  "title": "Learn PostgreSQL and Docker",
+  "done": true
 }
 ```
 
-## Example SQL Query
+## Verification Performed
 
-The following query returns all completed tasks:
-
-```sql
-SELECT *
-FROM tasks
-WHERE done = 1;
-```
-
-## Database Screenshot
-
-![SQLite database screenshot](docs/database-view.png)
-
-## Persistence
-
-Tasks are stored inside SQLite instead of an in-memory Python list.
-
-This means that tasks remain available after the application server is stopped and restarted.
+The final verified commands, HTTP results, created task ID, and persistence restart result will be recorded here after the Docker test run.
 
 ## Author
 
-Your Asma Hussain
+Asma Hussain
