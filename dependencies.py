@@ -1,11 +1,8 @@
-from repositories.sqlite_repository import (
-    SQLiteTaskRepository,
-)
+from repositories.postgres_repository import PostgresTaskRepository
 from services.task_service import TaskService
 
 
-task_repository = SQLiteTaskRepository()
-
+task_repository = PostgresTaskRepository()
 task_service = TaskService(task_repository)
 
 
