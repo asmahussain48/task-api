@@ -236,5 +236,5 @@ def delete_task(task_id: int):
             )
 
         connection.commit()
-
+# sjaj
     return Response(status_code=204)
