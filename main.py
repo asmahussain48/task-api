@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from auth.auth_routes import router as auth_router
 from config.supabase_client import get_supabase_client
 from routes.task_routes import router as task_router
-
+from routes.auth_routes import router as public_auth_router
 
 app = FastAPI(
     title="Task API",
@@ -34,3 +34,4 @@ def health_check():
 app.include_router(task_router)
 
 app.include_router(auth_router)
+app.include_router(public_auth_router)
