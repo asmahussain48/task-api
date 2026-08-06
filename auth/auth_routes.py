@@ -97,3 +97,24 @@ def login(body: dict):
         "access_token": response.session.access_token,
         "refresh_token": response.session.refresh_token,
     }
+
+
+@router.post("/logout")
+def logout():
+
+    supabase = get_supabase_client()
+
+    try:
+        supabase.auth.sign_out()
+
+        return {
+            "message": "Successfully logged out"
+        }
+
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Logout failed"
+            },
+        )
